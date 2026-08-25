@@ -406,8 +406,8 @@
 
         // 🎯 [신규 추가] 유저 관리 권한 변경 핸들러 함수
         async function toggleUserRole(targetUsername, currentAdminStatus) {
-            const actionText = currentAdminStatus ? "일반 사원" : "관리자";
-            if (!confirm(`[권한 변경] ${targetUsername} 사용자를 ${actionText}으로 지정하시겠습니까?`)) return;
+            const actionText = currentAdminStatus ? "일반 사원으" : "관리자";
+            if (!confirm(`[권한 변경] ${targetUsername} 사용자를 ${actionText}로 지정하시겠습니까?`)) return;
 
             try {
                 const response = await fetch(`/api/admin/users/${targetUsername}/role`, {
