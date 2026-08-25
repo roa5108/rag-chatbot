@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project AI - 관리자 스튜디오</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col md:flex-row">
+
+    <!-- 왼쪽 사이드바 영역 -->
+    <div class="w-full md:w-80 bg-slate-900 text-white p-6 flex flex-col justify-between shadow-xl shrink-0">
+        <div>
+            <div class="mb-8">
+                <h1 class="text-2xl font-bold tracking-tight text-rose-400">Admin Studio</h1>
+                <p class="text-xs text-slate-400">RAG 백오피스 시스템 v1.0</p>
+            </div>
+
+            <!-- 대시보드 탭 메뉴 제어 (회원 관리 메뉴 추가) -->
+            <div class="space-y-2 mb-6">
+                <button onclick="switchTab('files')" id="tab-btn-files" class="w-full py-3 px-4 rounded-xl text-left font-medium transition bg-slate-800 text-white border-l-4 border-rose-500">
+                    📚 지식 문서 관리
+                </button>
+                <button onclick="switchTab('history')" id="tab-btn-history" class="w-full py-3 px-4 rounded-xl text-left font-medium transition text-slate-400 hover:bg-slate-800/50 hover:text-white">
+                    💬 전체 대화 이력 조회
+                </button>
+                <button onclick="switchTab('unanswered')" id="tab-btn-unanswered" class="w-full py-3 px-4 rounded-xl text-left font-medium transition text-slate-400 hover:bg-slate-800/50 hover:text-white">
+                    <span>⚠️ 미답변 질문 로그</span>
+                </button>
+                <!-- 🎯 [신규] 회원 관리 탭 버튼 추가 -->
+                <button onclick="switchTab('users')" id="tab-btn-users" class="w-full py-3 px-4 rounded-xl text-left font-medium transition text-slate-400 hover:bg-slate-800/50 hover:text-white flex justify-between items-center">
+                    <span>👥 사내 회원 계정 관리</span>
+                </button>
+            </div>
+
+            <!-- 사용자 화면으로 돌아가는 버튼 -->
+            <button onclick="window.location.href='/'" class="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-medium transition mb-6 text-left px-4 flex items-center justify-between text-slate-300">
+                <span>💬 챗봇 화면으로 복귀</span>
+                <span class="text-xs text-slate-500">▶</span>
+            </button>
+        </div>
+
+        <div>
+            <p class="text-xs text-slate-500 mb-2">SYSTEM</p>
+            <button onclick="handleLogout()" class="block w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-center text-sm font-medium rounded-xl transition cursor-pointer">
+                로그아웃
+            </button>
+        </div>
+    </div>
+
+    <!-- 오른쪽 메인 콘텐츠 영역 -->
+    <div class="flex-1 flex flex-col h-[calc(100vh-100px)] md:h-screen bg-white overflow-y-auto">
+        <!-- 헤더 -->
+        <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white sticky top-0 z-10 gap-2">
+            <h2 id="section-title" class="text-xl font-bold text-slate-800">📚 등록 지식 문서 관리</h2>
+            <span id="admin-user-info" class="text-xs sm:text-sm text-slate-500 font-medium bg-slate-100 px-3 py-1.5 rounded-lg"></span>
+        </div>
+
+        <!-- 본문 콘텐츠 -->
+        <div class="p-4 md:p-8 max-w-5xl w-full mx-auto space-y-6">
+
+            <!-- ① 지식 문서 관리 섹션 -->
+            <div id="section-files" class="tab-content bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                <div class="p-6 border-b border-slate-100 bg-slate-50/50">
+                    <h3 class="font-bold text-slate-800 mb-1">📤 새 지식 문서 업로드 (DB 적재)</h3>
+                    <p class="text-xs text-slate-500 mb-4">PDF 또는 DOCX 형식의 회사 가이드 문서를 업로드하면 자동으로 텍스트 분할 및 임베딩이 진행됩니다.</p>
+                    <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                        <input type="file" id="upload-file-input" accept=".pdf,.docx,.doc" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-slate-200 rounded-xl bg-white p-1">
+                        <button onclick="uploadFile()" id="upload-submit-btn" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition shrink-0">
+                            🚀 문서 적재 시작
+                        </button>
+                    </div>
+                </div>
+                <div class="p-5 border-b border-slate-100 bg-white flex justify-between items-center">
+                    <div>
+                        <h3 class="font-bold text-slate-800">DB 적재 문서 목록</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">현재 벡터 데이터베이스에 검색 소스로 할당된 파일 리스트입니다.</p>
+                    </div>
+                    <button onclick="loadRegisteredFiles()" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-semibold rounded-lg transition">🔄 새로고침</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[500px]">
+                        <thead>
+                            <tr class="border-b border-slate-100 bg-slate-50/30 text-xs font-bold text-slate-400 tracking-wider">
+                                <th class="p-4 pl-6 w-20">번호</th>
+                                <th class="p-4">파일명 (Source)</th>
+                                <th class="p-4 text-center w-32">관리 액션</th>
+                            </tr>
+                        </thead>
+                        <tbody id="file-list-tbody" class="text-sm divide-y divide-slate-100 text-slate-600"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ② 전체 대화 이력 조회 섹션 -->
+            <div id="section-history" class="tab-content hidden bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                    <div>
+                        <h3 class="font-bold text-slate-800">전체 사원 질의응답 이력</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">사원들이 질문한 내용과 AI가 답변한 로그 타임라인입니다.</p>
+                    </div>
+                    <button onclick="loadChatHistory()" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-semibold rounded-lg transition">🔄 새로고침</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[700px]">
+                        <thead>
+                            <tr class="border-b border-slate-100 bg-slate-50/30 text-xs font-bold text-slate-400 tracking-wider">
+                                <th class="p-4 pl-6 w-32">일시/사원명</th>
+                                <th class="p-4">질문 내용(Question)</th>
+                                <th class="p-4">AI 생성 답변(Answer)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-list-tbody" class="text-sm divide-y divide-slate-100 text-slate-600"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ③ 미답변 질문 로그 섹션 -->
+            <div id="section-unanswered" class="tab-content hidden bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                    <div>
+                        <h3 class="font-bold text-rose-800">⚠️ 정보 누락/미답변 질문 데이터</h3>
+                        <p class="text-xs text-rose-500 mt-0.5">문서에 정보가 부족하여 인공지능이 응답하지 못한 로그입니다. 분석 후 추가 보완 문서를 준비하세요.</p>
+                    </div>
+                    <button onclick="loadUnansweredLogs()" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold rounded-lg transition">🔄 새로고침</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[600px]">
+                        <thead>
+                            <tr class="border-b border-slate-100 bg-slate-50/30 text-xs font-bold text-slate-400 tracking-wider">
+                                <th class="p-4 pl-6 w-20">번호</th>
+                                <th class="p-4 w-36">일시 / 등록자</th>
+                                <th class="p-4">실패한 사원 질문 (Question)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="unanswered-list-tbody" class="text-sm divide-y divide-slate-100 text-slate-600"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 🎯 ④ [신규 추가] 사내 회원 계정 관리 섹션 -->
+            <div id="section-users" class="tab-content hidden bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                    <div>
+                        <h3 class="font-bold text-slate-800">👥 등록 사원 계정 명부</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">등록된 사원 정보 리스트입니다.</p>
+                    </div>
+                    <button onclick="loadUserManagement()" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-semibold rounded-lg transition">🔄 새로고침</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[600px]">
+                        <thead>
+                            <tr class="border-b border-slate-100 bg-slate-50/30 text-xs font-bold text-slate-400 tracking-wider">
+                                <th class="p-4 pl-6 w-20">번호</th>
+                                <th class="p-4">사원 ID / 계정명</th>
+                                <th class="p-4 w-40 text-center">보안 등급 권한</th>
+                                <th class="p-4 text-center w-40">권한 변경 액션</th>
+                            </tr>
+                        </thead>
+                        <tbody id="user-list-tbody" class="text-sm divide-y divide-slate-100 text-slate-600"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // 페이지 진입 보안 검증
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('token');
+            const isAdmin = localStorage.getItem('isAdmin');
+            const username = localStorage.getItem('username');
+
+            if (!token || isAdmin !== 'true') {
+                alert("접근 권한이 없거나 인증이 만료되었습니다. 관리자 계정으로 로그인해 주세요.");
+                window.location.href = '/login';
+                return;
+            }
+            if (username) {
+                document.getElementById('admin-user-info').innerText = `😎 관리자 [${username}] 로그인 중`;
+            }
+            loadRegisteredFiles();
+        });
+
+        // 탭 전환 핸들러 (users 탭 분기 추가)
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`section-${tabId}`).classList.remove('hidden');
+
+            const menuIds = ['files', 'history', 'unanswered', 'users'];
+            menuIds.forEach(id => {
+                const btn = document.getElementById(`tab-btn-${id}`);
+                if (id === tabId) {
+                    btn.className = "w-full py-3 px-4 rounded-xl text-left font-medium transition bg-slate-800 text-white border-l-4 border-rose-500";
+                } else {
+                    btn.className = "w-full py-3 px-4 rounded-xl text-left font-medium transition text-slate-400 hover:bg-slate-800/50 hover:text-white";
+                }
+            });
+
+            if(tabId === 'files') {
+                document.getElementById('section-title').innerText = "📚 등록 지식 문서 관리";
+                loadRegisteredFiles();
+            } else if(tabId === 'history') {
+                document.getElementById('section-title').innerText = "💬 전체 대화 이력 조회";
+                loadChatHistory();
+            } else if(tabId === 'unanswered') {
+                document.getElementById('section-title').innerText = "⚠️ 미답변 질문 로그 모니터링";
+                loadUnansweredLogs();
+            } else if(tabId === 'users') {
+                document.getElementById('section-title').innerText = "👥 사내 회원 계정 관리";
+                loadUserManagement();
+            }
+        }
+
+        // ① 문서 목록 패치
+        async function loadRegisteredFiles() {
+            const tbody = document.getElementById('file-list-tbody');
+            tbody.innerHTML = '<tr><td colspan="3" class="p-8 text-center text-slate-400">데이터 동기화 중...</td></tr>';
+            try {
+                const response = await fetch('/api/admin/files', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (response.status === 401 || response.status === 403) { window.location.href = '/login'; return; }
+
+                const data = await response.json();
+                tbody.innerHTML = '';
+
+                let filesArray = Array.isArray(data) ? data : (data.documents || data.files || Object.values(data));
+
+                if (!filesArray || filesArray.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="p-8 text-center text-slate-400">현재 DB에 등록된 지식 문서가 없습니다.</td></tr>';
+                    return;
+                }
+
+                filesArray.forEach((filename, idx) => {
+                    const displayUrl = typeof filename === 'object' ? (filename.filename || JSON.stringify(filename)) : filename;
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50/50 transition";
+                    tr.innerHTML = `
+                        <td class="p-4 pl-6 font-mono text-xs text-slate-400">${idx + 1}</td>
+                        <td class="p-4 font-medium text-slate-700">data\\${displayUrl}</td>
+                        <td class="p-4 text-center">
+                            <button onclick="deleteFile('${displayUrl}')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold rounded-lg transition">🗑️ 삭제</button>
+                        </td>`;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="3" class="p-8 text-center text-rose-500 font-medium">문서 API 갱신 실패</td></tr>';
+            }
+        }
+
+        // 파일 업로드 처리 함수
+        async function uploadFile() {
+            const fileInput = document.getElementById('upload-file-input');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("업로드할 파일을 먼저 선택해 주세요.");
+                return;
+            }
+
+            const btn = document.getElementById('upload-submit-btn');
+            const originalText = btn.innerText;
+
+            btn.disabled = true;
+            btn.innerText = "⏳ 임베딩 및 적재 중...";
+            btn.className = "px-5 py-3 bg-slate-300 text-slate-500 font-semibold text-sm rounded-xl transition shrink-0 cursor-not-allowed";
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                const response = await fetch('/api/admin/upload', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`🎉 문서 적재 완료! 총 ${result.chunks}개의 문서 조각으로 분할되어 적재되었습니다.`);
+                    fileInput.value = '';
+                    loadRegisteredFiles();
+                } else {
+                    const errData = await response.json();
+                    alert(`업로드 실패: ${errData.detail || "알 수 없는 에러가 발생했습니다."}`);
+                }
+            } catch (e) {
+                alert("서버와 통신하는 중 오류가 발생했습니다.");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
+                btn.className = "px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition shrink-0";
+            }
+        }
+
+        // ② 전체 대화 이력 조회 함수
+        async function loadChatHistory() {
+            const tbody = document.getElementById('history-list-tbody');
+            tbody.innerHTML = '<tr><td colspan="3" class="p-8 text-center text-slate-400">대화 로그 로딩 중...</td></tr>';
+            try {
+                const response = await fetch('/api/admin/history', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const data = await response.json();
+                tbody.innerHTML = '';
+
+                if(!data || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="p-8 text-center text-slate-400">축적된 대화 이력이 없습니다.</td></tr>';
+                    return;
+                }
+
+                data.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50/50 transition vertical-align-top";
+                    tr.innerHTML = `
+                        <td class="p-4 pl-6 text-xs text-slate-500">
+                            <span class="block font-semibold text-slate-700">${item.username}</span>
+                            <span class="block text-[10px] text-slate-400 mt-0.5">${item.timestamp}</span>
+                        </td>
+                        <td class="p-4 font-medium text-slate-800 max-w-xs break-words">${item.question}</td>
+                        <td class="p-4 text-xs text-slate-600 max-w-sm break-words bg-slate-50/50">${item.answer}</td>`;
+                    tbody.appendChild(tr);
+                });
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="3" class="p-8 text-center text-rose-500">이력 로드 실패</td></tr>';
+            }
+        }
+
+        // ③ 미답변 질문 로그 조회 함수
+        async function loadUnansweredLogs() {
+            const tbody = document.getElementById('unanswered-list-tbody');
+            tbody.innerHTML = '<tr><td colspan="3" class="p-8 text-center text-slate-400">품질 개선용 로그 수집 중...</td></tr>';
+            try {
+                const response = await fetch('/api/admin/unanswered', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const data = await response.json();
+                tbody.innerHTML = '';
+
+                if(!data || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="p-8 text-center text-emerald-600 font-medium">🎉 누락된 정보 없이 모든 질문에 완벽히 대응 중입니다.</td></tr>';
+                    return;
+                }
+
+                data.forEach((item, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-rose-50/30 transition bg-rose-50/10";
+                    tr.innerHTML = `
+                        <td class="p-4 pl-6 font-mono text-xs text-rose-400">${idx + 1}</td>
+                        <td class="p-4 text-xs text-slate-500">
+                            <span class="block font-semibold text-slate-700">${item.username}</span>
+                            <span class="block text-[10px] text-slate-400 mt-0.5">${item.timestamp}</span>
+                        </td>
+                        <td class="p-4 font-semibold text-rose-700 max-w-xl break-words">💡 ${item.question}</td>`;
+                    tbody.appendChild(tr);
+                });
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="3" class="p-8 text-center text-rose-500">로그 취합 오류</td></tr>';
+            }
+        }
+
+        // 🎯 ④ [신규 추가] 사내 회원 관리 목록 로드 함수
+        async function loadUserManagement() {
+            const tbody = document.getElementById('user-list-tbody');
+            tbody.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-slate-400">사용자 계정 명부 호출 중...</td></tr>';
+            try {
+                const response = await fetch('/api/admin/users', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const data = await response.json();
+                tbody.innerHTML = '';
+
+                if (!data || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-slate-400">가입된 사원 정보가 존재하지 않습니다.</td></tr>';
+                    return;
+                }
+
+                data.forEach((user, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50/50 transition";
+
+                    // 관리자 등급 여부에 따른 배지 스타일 가이드
+                    const roleBadge = user.is_admin
+                        ? `<span class="px-2.5 py-1 bg-rose-100 text-rose-700 font-bold text-xs rounded-full whitespace-nowrap">Admin (관리자)</span>`
+                        : `<span class="px-2.5 py-1 bg-slate-100 text-slate-600 font-medium text-xs rounded-full whitespace-nowrap">User (일반사원)</span>`;
+
+                    // 액션 버튼 제어 (자기 자신은 권한 변경 방지)
+                    const isSelf = user.username === localStorage.getItem('username');
+                    const actionBtn = isSelf
+                        ? `<span class="text-xs text-slate-400 italic font-medium">본인 계정</span>`
+                        : `<button onclick="toggleUserRole('${user.username}', ${user.is_admin})" class="px-3 py-1.5 ${user.is_admin ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-600'} text-xs font-semibold rounded-lg transition">🔧 권한 변경</button>`;
+
+                    tr.innerHTML = `
+                        <td class="p-4 pl-6 font-mono text-xs text-slate-400">${idx + 1}</td>
+                        <td class="p-4 font-semibold text-slate-700">👤 ${user.username}</td>
+                        <td class="p-4 text-center">${roleBadge}</td>
+                        <td class="p-4 text-center">${actionBtn}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-rose-500">회원 목록 API 호출 실패</td></tr>';
+            }
+        }
+
+        // 🎯 [신규 추가] 유저 관리 권한 변경 핸들러 함수
+        async function toggleUserRole(targetUsername, currentAdminStatus) {
+            const actionText = currentAdminStatus ? "일반 사원" : "관리자";
+            if (!confirm(`[권한 변경] ${targetUsername} 사용자를 ${actionText}으로 지정하시겠습니까?`)) return;
+
+            try {
+                const response = await fetch(`/api/admin/users/${targetUsername}/role`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({ is_admin: !currentAdminStatus })
+                });
+
+                if (response.ok) {
+                    alert("계정 권한 등급이 성공적으로 업데이트되었습니다.");
+                    loadUserManagement(); // 목록 갱신
+                } else {
+                    alert("권한 변경 실패. 백엔드 라우터 설정을 확인해 주세요.");
+                }
+            } catch (e) {
+                alert("서버 통신 중 에러가 발생했습니다.");
+            }
+        }
+
+        // 문서 삭제 함수
+        async function deleteFile(filename) {
+            if (!confirm(`[경고] data\\${filename} 소스를 영구 삭제하시겠습니까?`)) return;
+
+            const btn = event.target;
+            const originalText = btn.innerText;
+
+            btn.disabled = true;
+            btn.innerText = "⏳ 삭제 중...";
+            btn.className = "px-3 py-1.5 bg-slate-200 text-slate-400 text-xs font-semibold rounded-lg transition cursor-not-allowed";
+
+            try {
+                const response = await fetch(`/api/admin/files/${encodeURIComponent(filename)}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+
+                if (response.ok) {
+                    alert("데이터베이스에서 성공적으로 제거되었습니다.");
+                    loadRegisteredFiles();
+                } else {
+                    alert("삭제에 실패했습니다. 관리자 권한이나 백엔드 로그를 확인하세요.");
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    btn.className = "px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold rounded-lg transition";
+                }
+            } catch (e) {
+                alert("서버 통신 중 오류가 발생했습니다.");
+                btn.disabled = false;
+                btn.innerText = originalText;
+                btn.className = "px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold rounded-lg transition";
+            }
+        }
+
+        function handleLogout() {
+            localStorage.clear();
+            alert("로그아웃 되었습니다.");
+            window.location.href = '/login';
+        }
+    </script>
+</body>
+</html>
