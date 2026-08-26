@@ -7,7 +7,6 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from typing import Optional
-from dotenv import load_dotenv
 
 
 # 1. 공통 무료 한국어 임베딩 모델
