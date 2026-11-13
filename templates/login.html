@@ -51,37 +51,60 @@
         }
 
         document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value.trim();
+    e.preventDefault();
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
 
-            if (isRegisterMode) {
-                const isAdmin = document.getElementById('is_admin').checked;
-                try {
-                    const res = await fetch(`/api/auth/register?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&is_admin=${isAdmin}`, { method: 'POST' });
-                    const data = await res.json();
-                    if(!res.ok) throw new Error(data.detail || '가입 처리 중 오류 발생');
-                    alert("계정 등록 완료! 설정한 정보로 로그인해 주세요.");
-                    toggleMode();
-                } catch(err) { alert(err.message); }
-            } else {
-                const formData = new URLSearchParams();
-                formData.append('username', username);
-                formData.append('password', password);
+    if (!username || !password) {
+        alert("아이디와 비밀번호를 모두 입력해 주세요.");
+        return;
+    }
 
-                try {
-                    const response = await fetch('/api/auth/login', { method: 'POST', body: formData });
-                    const data = await response.json();
-                    if (!response.ok) throw new Error(data.detail || '로그인에 실패했습니다.');
+    // 1. 회원가입 모드인 경우
+    if (isRegisterMode) {
+        const isAdmin = document.getElementById('is_admin').checked;
+        try {
+            const res = await fetch(`/api/auth/register?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&is_admin=${isAdmin}`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+            if(!res.ok) throw new Error(data.detail || '가입 처리 중 오류 발생');
 
-                    localStorage.setItem('token', data.access_token);
-                    localStorage.setItem('isAdmin', data.is_admin);
-                    localStorage.setItem('username', username);
+            alert("계정 등록 완료! 해당 계정으로 로그인해 주세요.");
+            toggleMode(); // 가입 완료 후 자동으로 로그인 모드로 전환
+        } catch(err) {
+            alert(err.message);
+        }
+    }
+    // 2. 로그인 모드인 경우 (반드시 /api/auth/login 호출)
+    else {
+        const formData = new URLSearchParams();
+        formData.append('username', username);
+        formData.append('password', password);
 
-                    window.location.href = (data.is_admin === true || data.is_admin === 'true') ? '/admin' : '/';
-                } catch (err) { alert(err.message); }
-            }
-        });
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: formData
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || '로그인에 실패했습니다.');
+
+            // 토큰 및 사용자 정보 저장
+            localStorage.setItem('token', data.access_token);
+            localStorage.setItem('isAdmin', data.is_admin);
+            localStorage.setItem('username', username);
+
+            // 이동
+            window.location.href = (data.is_admin === true || data.is_admin === 'true') ? '/admin' : '/';
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+});
     </script>
 </body>
 </html>

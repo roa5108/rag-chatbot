@@ -1,18 +1,25 @@
 import os
+from typing import Optional
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_ollama import ChatOllama
 from langchain_chroma import Chroma
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from typing import Optional
 
 
 # 1. 공통 무료 한국어 임베딩 모델
-def get_embedding_model():
-    return OpenAIEmbeddings(model="text-embedding-3-small")
+# def get_embedding_model():
+#     return OpenAIEmbeddings(model="text-embedding-3-small")
 
+def get_embedding_model():
+    return HuggingFaceEmbeddings(
+        model_name="jhgan/ko-sroberta-multitask",
+        model_kwargs={'device': 'cpu'},
+        encode_kwargs={'normalize_embeddings': True}
+    )
 
 # 2. 지식 문서 업로드 및 파싱
 def process_and_upload_file(file_path: str) -> int:
@@ -91,7 +98,7 @@ def generate_answer(question: str, search_mode: str = "multi", selected_doc: Opt
             "score": round(display_score, 4)
         })
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = ChatGoogleGenerativeAI(model="gemini-3.8-flash", temperature=0)
 
     # 페르소나 및 NO_INFO 출력 통제 지침
     system_prompt = (
