@@ -1,29 +1,26 @@
 import os
+import json
+import urllib.request
+import urllib.error
 from typing import Optional
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_ollama import ChatOllama
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 
 
-# 1. 공통 무료 한국어 임베딩 모델
-# def get_embedding_model():
-#     return OpenAIEmbeddings(model="text-embedding-3-small")
-
+# 1. Render 무료 플랜(512MB RAM) 최적화용 Google API 임베딩 모델
 def get_embedding_model():
-    return HuggingFaceEmbeddings(
-        model_name="jhgan/ko-sroberta-multitask",
-        model_kwargs={'device': 'cpu'},
-        encode_kwargs={'normalize_embeddings': True}
+    api_key = os.getenv("GOOGLE_API_KEY")
+    return GoogleGenerativeAIEmbeddings(
+        model="models/gemini-embedding-001",
+        google_api_key=api_key
     )
+
 
 # 2. 지식 문서 업로드 및 파싱
 def process_and_upload_file(file_path: str) -> int:
-    """PDF 및 DOCX 파일을 파싱하고 로컬 임베딩으로 Vector DB에 적재"""
+    """PDF 및 DOCX 파일을 파싱하고 Google 임베딩 API로 Vector DB에 적재"""
     ext = os.path.splitext(file_path)[-1].lower()
 
     if ext == ".pdf":
@@ -54,12 +51,60 @@ def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
 
+def call_gemini_rag(system_prompt: str, user_prompt: str) -> str:
+    """SDK 타임아웃 및 스레드 블로킹을 피하기 위한 직접 REST API 호출"""
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError("GOOGLE_API_KEY 환경 변수가 설정되지 않았습니다.")
+
+    payload = {
+        "system_instruction": {
+            "parts": [{"text": system_prompt}]
+        },
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": user_prompt}]
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.0
+        }
+    }
+    data = json.dumps(payload).encode("utf-8")
+
+    candidate_models = [
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash"
+    ]
+
+    last_error = None
+    for model_name in candidate_models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=25) as res:
+                res_body = json.loads(res.read().decode("utf-8"))
+                return res_body["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as e:
+            last_error = e
+            continue
+
+    raise RuntimeError(f"Gemini RAG 호출 실패: {last_error}")
+
+
 # 3. RAG 답변 생성
 def generate_answer(question: str, search_mode: str = "multi", selected_doc: Optional[str] = None) -> dict:
     embeddings = get_embedding_model()
     vectorstore = Chroma(embedding_function=embeddings, persist_directory="./chroma_db")
 
-    search_kwargs = {"k": 5}  # 4개에서 5개로 늘려 정보 누락 방지
+    search_kwargs = {"k": 5}
     if search_mode == "single" and selected_doc:
         search_kwargs["filter"] = {
             "$or": [
@@ -87,7 +132,6 @@ def generate_answer(question: str, search_mode: str = "multi", selected_doc: Opt
 
         page = doc.metadata.get("page", 0)
 
-        # 마이너스 점수 경고 해결: 거리가 멀수록(값이 클수록) 점수가 낮아지도록 양수 정규화
         display_score = max(0.0, min(1.0, 1.0 / (1.0 + dist))) if dist >= 0 else max(0.0, min(1.0, 1.0 / (1.0 + abs(dist))))
         if dist < 0:
             display_score = max(0.0, min(1.0, 0.5 + (display_score / 2)))
@@ -98,27 +142,18 @@ def generate_answer(question: str, search_mode: str = "multi", selected_doc: Opt
             "score": round(display_score, 4)
         })
 
-    llm = ChatGoogleGenerativeAI(model="gemini-3.8-flash", temperature=0)
+    context_text = format_docs(retrieved_docs)
 
-    # 페르소나 및 NO_INFO 출력 통제 지침
     system_prompt = (
         "당신은 사내 문서 검색 전문가입니다. 반드시 제공된 문맥(Context)의 정보만을 바탕으로 '사용자의 질문'에 대해서만 친절하게 답변하세요.\n"
-        "문맥에 질문และ 답변 형식이 포함되어 있더라도 절대 그것을 복사하거나 흉내 내지 말고, 오직 사용자가 입력한 질문(Input)에 대한 명확한 설명만 새로 작성하세요.\n"
+        "문맥에 질문과 답변 형식이 포함되어 있더라도 절대 그것을 복사하거나 흉내 내지 말고, 오직 사용자가 입력한 질문(Input)에 대한 명확한 설명만 새로 작성하세요.\n"
         "답변할 때는 관련된 핵심 수치나 조항 가이드라인이 문맥에 있다면 생략하지 말고 모두 인용하여 서술하세요.\n"
         "만약 문맥을 통해서 답변을 확실히 알 수 없거나 정보가 부족하다면, 무조건 반드시 단어 'NO_INFO'를 답변에 포함하여 출력하세요.\n\n"
-        "Context:\n{context}"
+        f"Context:\n{context_text}"
     )
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", "{input}"),
-    ])
+    ai_response = call_gemini_rag(system_prompt, question)
 
-    context_text = format_docs(retrieved_docs)
-    chain = prompt | llm | StrOutputParser()
-    ai_response = chain.invoke({"context": context_text, "input": question}, config={"run_name": "project-ai-rag"})
-
-    # 🎯 [수정 포인트] 미답변 로그 수집용 플래그 생성
     is_unanswered = False
     if "NO_INFO" in ai_response:
         is_unanswered = True
@@ -130,7 +165,7 @@ def generate_answer(question: str, search_mode: str = "multi", selected_doc: Opt
     return {
         "answer": ai_response,
         "sources": retrieved_sources,
-        "unanswered": is_unanswered  # main.py에서 미답변 로그 저장을 판단할 수 있도록 값 전달
+        "unanswered": is_unanswered
     }
 
 

@@ -1,2 +1,5 @@
 .env
 service_account.json
+*.db
+chroma_db/
+rag_chatbot_db
